@@ -2,7 +2,7 @@
 
 Sistema modular de prompts para estandarizar y escalar el trabajo con asistentes de IA.
 
-> **📖 Empezá por aquí:** abrí `docs/MANUAL_motor_personal.pdf`. Tiene la guía completa (Nota: el PDF debe ser actualizado para coincidir con esta nueva estructura simplificada).
+> **📖 Empezá por aquí:** abrí `docs/MANUAL_motor_personal.pdf`. Tiene la guía completa.
 
 ---
 
