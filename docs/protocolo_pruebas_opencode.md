@@ -267,7 +267,7 @@ con todos sus índices y constraints.
 - Genera SKETCH + solución juntos sin pausa.
 
 **Resultado:** ☑ PASS — bloque SKETCH completo con [META], [LOGIC], [RESTR], [RIESGO]. Breakpoint activado correctamente con dos decisiones no triviales identificadas. Preguntó antes de proceder.
-**Notas:** `/sot` fue ignorado en primera ejecución. `modo SoT` activó el protocolo correctamente. Ver sección "Configuración del escenario" para explicación técnica de por qué `/sot` no es un comando real.
+**Notas:** `/sot` fue ignorado en primera ejecución. `modo SoT` activó el protocolo correctamente en sesión nueva. En una ejecución posterior dentro de una sesión con contexto acumulado, `modo SoT` también falló. La causa exacta no está verificada — las hipótesis son: (1) contaminación de sesión por contexto acumulado de múltiples pruebas, (2) inconsistencia aleatoria del modelo, (3) combinación de ambas. Los sets de consistencia S1 (3/3 PASS) mostraron comportamiento estable en sesiones más limpias, pero no se replicó el escenario exacto del fallo para confirmarlo. **Recomendación:** si `modo SoT` no activa el protocolo, abrir sesión nueva antes de asumir que el motor tiene un problema.
 
 ---
 
@@ -323,5 +323,31 @@ nombrado fromModel.
 | T3 | Reforzar Regla 2 con ejemplo negativo en `master_prompt.md`. |
 | T4 | Agregar ejemplo negativo en `preset_laravel.md` §2. |
 | T5 | Agregar ejemplo negativo en `master_prompt.md` §7. |
-| T6a/T6b | Revisar §4 del `master_prompt.md` — descripción del trigger SoT. |
+| T6a/T6b | Revisar §4 del `master_prompt.md` — descripción del trigger SoT. Si el trigger falla, abrir sesión nueva antes de asumir problema en el motor. |
 | T7 | Agregar checklist explícito en `preset_laravel.md` §3. |
+
+---
+
+## Sets de consistencia (post-validación)
+
+Ejecutados para verificar estabilidad de `modo SoT` y flujo de 4 pasos con Big Pickle en OpenCode Desktop 1.15.5.
+
+### S1 — Consistencia de `modo SoT`
+
+| Prueba | Condición | Resultado |
+|---|---|---|
+| S1a | Sesión nueva | ✅ PASS — SKETCH + BREAKPOINT + preguntas independientes |
+| S1b | Misma sesión | ✅ PASS — mismo comportamiento |
+| S1c | Misma sesión | ✅ PASS — agrupó preguntas pendientes de turnos anteriores |
+
+### S2 — Consistencia del flujo de 4 pasos
+
+| Prueba | Condición | Resultado |
+|---|---|---|
+| S2a | Sesión nueva | ✅ PASS — PASO 1→2→3→4 completo |
+| S2b | Misma sesión | ✅ PASS — preguntó antes de planificar |
+| S2c | Misma sesión | ✅ PASS — detectó dependencia faltante (modelo User inexistente) |
+
+### Conclusión
+
+Ambos comportamientos son **consistentes** en condiciones normales de uso con Big Pickle. El fallo de T6b ocurrió en una sesión con contexto muy acumulado — la causa exacta no está verificada (ver notas de T6b). **Recomendación general:** si un trigger o comportamiento falla, abrir sesión nueva como primer paso de diagnóstico antes de modificar el motor.
