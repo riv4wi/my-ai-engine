@@ -1,5 +1,40 @@
 # Protocolo de Pruebas — My AI Engine
-## Proyecto: `task-api` · Plataforma: OpenCode Desktop
+## Proyecto: `task-api` · Plataforma: OpenCode Desktop 1.15.5
+
+---
+
+## Configuración del escenario
+
+Antes de ejecutar las pruebas, definir el escenario de filesystem. El comportamiento del agente en T5 y T7 varía según este parámetro.
+
+### ¿Qué significa Filesystem ON/OFF?
+
+**Filesystem OFF** — el agente trabaja ciego. Solo conoce lo que está en el `AGENTS.md` y lo que vos pegás en el chat. Si pedís ver un archivo, no puede abrirlo — depende de que vos lo pegues o de que él lo haya generado en la sesión actual. Es el modo más portable entre plataformas (Claude web, ChatGPT, Gemini).
+
+**Filesystem ON** — el agente tiene acceso real al disco del proyecto. Puede abrir, leer y escribir archivos directamente. En OpenCode Desktop apuntando a WSL2, el agente opera sobre `/home/lrivas/proyectos/task-api/` como si fuera un desarrollador con acceso a la terminal.
+
+### Cómo funciona el sistema de permisos en OpenCode Desktop (WSL2)
+
+OpenCode solicita permiso explícito la primera vez que intenta acceder a una ruta fuera de su directorio base. El permiso se pide por ruta específica (ej: `/home/lrivas/proyectos/task-api/app/Models/*`).
+
+- **"Permitir una vez"** — acceso solo para la sesión actual. La próxima sesión vuelve a preguntar. Recomendado mientras explorás el comportamiento.
+- **"Permitir siempre"** — OpenCode guarda el permiso para ese proyecto. **Verificado en v1.15.5: es por proyecto, no global** — al abrir un proyecto diferente vuelve a solicitar permisos.
+
+> **Comportamiento observado:** OpenCode intenta primero la ruta Windows UNC (`/wsl.localhost/Ubuntu/...`) que falla, luego resuelve correctamente a la ruta WSL2 (`/home/lrivas/proyectos/...`). Es el comportamiento esperado cuando OpenCode corre en Windows pero el proyecto está en WSL2.
+
+### Implicación para las pruebas T5 y T7
+
+| Prueba | Filesystem OFF | Filesystem ON |
+|---|---|---|
+| T5 | El agente debe mostrar el código del bloque afectado en el chat | El agente lee el archivo real — una referencia con código visible es válida |
+| T7 | El agente debe mostrar el DTO en el chat | El agente abre el archivo y muestra el contenido con syntax highlighting |
+
+**En ambos casos aplica la Regla 5:** nunca sustituir código por descripciones o metadata de ubicación sin código visible.
+
+### Marcar el escenario antes de ejecutar
+
+☐ **Filesystem OFF** — agente sin acceso al disco  
+☐ **Filesystem ON** — agente con acceso al disco (permisos otorgados)
 
 ---
 
@@ -161,9 +196,9 @@ debug_tasks que lea del .env la variable TASKS_DEBUG.
 
 ---
 
-## T5 — Archivo completo, no fragmentos (Regla 5)
+## T5 — Código mínimo verificable, nunca metadata (Regla 5)
 
-**Objetivo:** verificar que al modificar un archivo devuelve el archivo completo.
+**Objetivo:** verificar que ante una solicitud sobre un archivo existente, el agente muestra código verificable en lugar de descripciones o metadata.
 
 **Setup:** tener el `CreateTaskAction` generado en T3/T4.
 
@@ -173,17 +208,17 @@ Agregá un campo opcional due_date al CreateTaskAction.
 ```
 
 **Esperado:**
-- Devuelve `CreateTaskAction.php` **completo**.
-- Conserva todos los comentarios y estructura original.
-- No dice "agregá esto en la línea X" ni devuelve solo el fragmento.
+- Muestra el fragmento de código relevante (método o bloque afectado) — no el archivo completo si es grande.
+- Si el campo ya existe, muestra el código donde está implementado y pregunta qué específicamente se quiere cambiar.
+- Nunca sustituye código por descripciones, tablas de metadata o referencias a números de línea sin código.
 
 **Incorrecto:**
-- Devuelve solo el método o bloque modificado.
-- Dice "el resto del archivo queda igual".
-- Elimina o reordena comentarios existentes.
+- Responde solo con texto descriptivo: "ya está en la línea 12" sin mostrar código.
+- Devuelve una tabla de metadata sin ninguna línea de PHP.
+- Dice "no requiere cambios" sin mostrar nada.
 
-**Resultado:** ☑ PASS (tercera iteración con regla ajustada) — mostró el método `execute()` completo con firma tipada, cuerpo y tipo de retorno. Código verificable.
-**Notas:** Requirió 3 iteraciones de la Regla 5. La versión final "código mínimo verificable, nunca metadata" resolvió el problema. Modelo gratuito (Big Pickle) tiende a describir antes que mostrar — la regla explícita con antipatrones y tabla de criterios fue suficiente para corregirlo.
+**Resultado:** ☑ PASS (tercera iteración con regla ajustada) — mostró el fragmento relevante con código exacto y contexto de línea, luego preguntó qué específicamente cambiar antes de actuar.
+**Notas:** Requirió 3 iteraciones para llegar a la redacción correcta de la Regla 5. La versión final "código mínimo verificable, nunca metadata" es más precisa y token-eficiente que "archivo completo siempre".
 
 ---
 
@@ -210,15 +245,17 @@ considerando que el filtro más común es por status + due_date?
 
 ---
 
-## T6b — Con trigger /sot → con SoT
+## T6b — Con trigger SoT → con SoT
 
 **Objetivo:** verificar que con trigger aparece el bloque SKETCH y el breakpoint.
 
 **Prompt a copiar:**
 ```
-/sot Diseñá la migración completa para la tabla tasks
+modo SoT Diseñá la migración completa para la tabla tasks
 con todos sus índices y constraints.
 ```
+
+> **Nota sobre triggers:** usar `modo SoT` como trigger principal. `/sot` fue ignorado por Big Pickle en la primera ejecución — no es un comando del sistema sino texto plano, y no todos los modelos lo reconocen con la misma fiabilidad. `modo SoT` es semánticamente más explícito en español y resultó más confiable en las pruebas.
 
 **Esperado:**
 - Genera bloque `═══ SKETCH ═══` con `[META]`, `[LOGIC]`, `[RESTR]`, `[RIESGO]`.
@@ -229,8 +266,8 @@ con todos sus índices y constraints.
 - No genera SKETCH.
 - Genera SKETCH + solución juntos sin pausa.
 
-**Resultado:** ☑ PASS — bloque SKETCH completo con [META], [LOGIC], [RESTR], [RIESGO]. Breakpoint activado correctamente. Preguntó antes de proceder.
-**Notas:** [RIESGO] correcto y específico al contexto (tabla existente en BD real). Tabla de índices en el SKETCH como bonus de claridad.
+**Resultado:** ☑ PASS — bloque SKETCH completo con [META], [LOGIC], [RESTR], [RIESGO]. Breakpoint activado correctamente con dos decisiones no triviales identificadas. Preguntó antes de proceder.
+**Notas:** `/sot` fue ignorado en primera ejecución. `modo SoT` activó el protocolo correctamente. Ver sección "Configuración del escenario" para explicación técnica de por qué `/sot` no es un comando real.
 
 ---
 
@@ -257,8 +294,8 @@ nombrado fromModel.
 - Propiedades o métodos sin tipo.
 - `fromModel` sin tipo de retorno.
 
-**Resultado:** ☑ PASS — `declare(strict_types=1)` confirmado, `readonly class`, todas las propiedades tipadas, `fromModel(Task $task): self` con tipo de retorno, sin `mixed`, sin imports muertos.
-**Notas:** El agente omitió `declare(strict_types=1)` en el primer output (fragmento de clase). Requirió prompt adicional para verificar las primeras líneas. No es un fallo del motor — es un límite del fragmento mostrado. La Regla 5 revisada cubre esto correctamente.
+**Resultado:** ☑ PASS — con filesystem ON, OpenCode leyó el archivo real del disco y mostró el `TaskDTO` completo con syntax highlighting. `declare(strict_types=1)` confirmado, `readonly class`, 8 propiedades tipadas, `fromModel(Task $task): self` con tipo de retorno.
+**Notas:** OpenCode solicitó permisos en cascada (`task-api/*` → `task-api/app/DTOs/*`) antes de leer. Con filesystem OFF este test requeriría verificar `declare(strict_types=1)` con un prompt adicional — ver resultado original en sección de hallazgos.
 
 ---
 
@@ -270,7 +307,7 @@ nombrado fromModel.
 | T2 | Resistencia a suposiciones | Regla 1 | ☑ PASS (sesión nueva) |
 | T3 | Plan → aprobación → ejecución | Regla 2 | ☑ PASS |
 | T4 | config() vs env() | Preset §2 | ☑ PASS |
-| T5 | Código verificable, no metadata | Regla 5 | ☑ PASS (3° iteración) |
+| T5 | Código mínimo verificable, nunca metadata | Regla 5 | ☑ PASS (3° iteración) |
 | T6a | Sin trigger → sin SoT | Master §4 | ☑ PASS |
 | T6b | Con /sot → con SoT + breakpoint | Master §4 | ☑ PASS |
 | T7 | Tipado estricto | Preset §3 | ☑ PASS |
