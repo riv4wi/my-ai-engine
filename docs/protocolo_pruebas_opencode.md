@@ -351,3 +351,36 @@ Ejecutados para verificar estabilidad de `modo SoT` y flujo de 4 pasos con Big P
 ### Conclusión
 
 Ambos comportamientos son **consistentes** en condiciones normales de uso con Big Pickle. El fallo de T6b ocurrió en una sesión con contexto muy acumulado — la causa exacta no está verificada (ver notas de T6b). **Recomendación general:** si un trigger o comportamiento falla, abrir sesión nueva como primer paso de diagnóstico antes de modificar el motor.
+
+---
+
+## Limitaciones conocidas del sistema
+
+### 1. No idempotencia garantizada
+
+El motor reduce la probabilidad de comportamientos incorrectos mediante instrucciones explícitas, pero **no puede garantizar idempotencia absoluta con ningún LLM**. Los modelos de lenguaje son sistemas probabilísticos por diseño — la misma instrucción puede producir resultados diferentes entre ejecuciones.
+
+- La diferencia entre modelos gratuitos y de pago es de **grado**, no de naturaleza. No está verificado que modelos de pago sean 100% deterministas con estas instrucciones.
+- La confiabilidad observada varía según el modelo, la sesión y el contexto acumulado.
+- Para uso en producción: validar el comportamiento con el modelo específico que se vaya a usar antes de confiar en él para tareas críticas.
+
+### 2. No hay garantía de que el modelo usó la base de conocimientos
+
+No existe forma técnica de garantizar que el modelo razonó usando el motor cargado. Lo que sí es posible es **diseñar outputs verificables**:
+
+| Estrategia | Descripción | Limitación |
+|---|---|---|
+| **Interrogatorio (T1)** | Pedirle que cite las reglas aplicadas al inicio de sesión | Puede citar correctamente sin haberlas aplicado |
+| **Trazabilidad en output** | Instrucción para referenciar la regla en cada decisión | Aumenta tokens; el modelo puede fabricar referencias |
+| **Eval automatizado** | Casos de prueba con respuestas esperadas (como T1-T7) | Requiere mantenimiento; no cubre casos nuevos |
+| **Logging + revisión** | Guardar historial y revisar periódicamente | No escala bien |
+
+La combinación más robusta para producción es **trazabilidad en output + eval automatizado periódico**.
+
+### 3. Comportamiento dependiente del modelo
+
+El motor fue validado con **Big Pickle (OpenCode Desktop 1.15.5)**. Comportamientos específicos — especialmente el trigger `modo SoT` y el flujo de 4 pasos — pueden necesitar ajustes al cambiar de modelo. Siempre ejecutar el set T1-T7 al adoptar un modelo nuevo.
+
+### 4. Contaminación de sesión (hipótesis no verificada)
+
+Se observó al menos un fallo de `modo SoT` en una sesión con contexto muy acumulado. La causa no fue verificada experimentalmente. Hipótesis posibles: volumen de contexto, actividad de filesystem, inconsistencia aleatoria del modelo, o combinación. Ver notas de T6b.
