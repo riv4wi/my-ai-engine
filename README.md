@@ -1,6 +1,4 @@
-# `My AI Engine` — `my-ai-engine/`
-<sub>Motor personal de pensamiento para uso en Inteligencia Artificial</sub>
-<sub>autor: riv4wi — Mayo 2026</sub>
+# Motor personal de pensamiento — `ai-motor/`
 
 Sistema modular de prompts para estandarizar y escalar el trabajo con asistentes de IA.
 
@@ -23,7 +21,7 @@ El "AI Motor" es un framework minimalista que consta de **solo 3 componentes pri
 ## Estructura del Repositorio
 
 ```text
-my-ai-engine/
+ai-motor/
 ├── README.md                              ← Este archivo
 ├── master_prompt.md                       ← Núcleo universal (siempre se carga)
 ├── preset_stack.md                        ← Plantilla base para reglas de stack
@@ -38,7 +36,7 @@ my-ai-engine/
 
 Imagina que estás trabajando en un proyecto llamado **apibml** que usa **Laravel** y **Oracle**.
 
-En lugar de guardar los contextos en esta carpeta de `my-ai-engine`, guardarás tus archivos instanciados en la carpeta de tu propio proyecto: `/home/user/proyectos/apibml/`.
+En lugar de guardar los contextos en esta carpeta de `ai-motor`, guardarás tus archivos instanciados en la carpeta de tu propio proyecto: `/home/user/proyectos/apibml/`.
 
 ### 1. Preparación (Una sola vez por proyecto)
 Copias las plantillas del motor hacia tu proyecto y las llenas con los datos reales:
@@ -47,7 +45,7 @@ Copias las plantillas del motor hacia tu proyecto y las llenas con los datos rea
 
 ### 2. Carga en una Sesión Diaria
 Cuando inicies una nueva conversación con la IA para trabajar en un ticket de **apibml**, le adjuntas estos 3 archivos:
-1. `my-ai-engine/master_prompt.md` *(el motor)*
+1. `ai-motor/master_prompt.md` *(el motor)*
 2. `proyectos/apibml/preset_laravel.md` *(las reglas del stack)*
 3. `proyectos/apibml/contexto_apibml.md` *(el estado actual del proyecto)*
 
